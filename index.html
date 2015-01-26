@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
 <style>
@@ -38,7 +38,17 @@ canvas {
 	image-rendering: optimize-contrast;
 }
 </style>
-<script src="perlin.js"></script>
+<script>
+window.onmousewheel = function(e){
+	console.log(e);
+	if(e.wheelDelta > 0){
+		zoom+= 0.5;
+	} else {
+		zoom-=.5;
+	}
+	zoom = Math.max(zoom,.5);
+}
+</script>
 </head>
 <body>
 	<div class="chat">
@@ -208,7 +218,7 @@ function intersects(point,region){
 }
 window.onload = function(){
 	board = document.getElementById("game").getContext("2d");
-	noise.seed(Math.random());
+//	noise.seed(Math.random());
 	//drawBg();
 	//drawBg({left:0,top:0});
 	setInterval(run,1000/100);
@@ -252,6 +262,7 @@ function run(){
 	
 
 }
+var zoom = 2;
 function drawPlayer(img,x,y,center,angle,test){
 
 	//myplayer.position.left += Math.sin(a) * myplayer.velocity;
@@ -260,6 +271,12 @@ function drawPlayer(img,x,y,center,angle,test){
 	//if(center || "x" == "r")
 		//board.translate((CANVAS_WIDTH / 2) - (x + 12.5),(CANVAS_HEIGHT / 2) - (y + 12.5));
 	//board.translate(x, y);
+	/*
+	Don't really know what's the goal, but the player will be going and going, growing? not sure.
+	As a kid I loved to break concepts of random things,
+	I think it'd be cool to be a planet that inhibits life, or alternatively - bring death to things. you choose how you'll look, you build yourself.
+	I guess that colliding with things will grant you the ability to improve yourself using the materials you got.
+	*/
 	basePos = myplayer.position;
 	
 	board.translate(CANVAS_WIDTH / 2,CANVAS_HEIGHT / 2);
@@ -269,7 +286,11 @@ function drawPlayer(img,x,y,center,angle,test){
 	}
 	if(angle != undefined)
 		board.rotate(angle);
-	board.drawImage(img,-12.5,-12.5,25,25);
+	//board.drawImage(img,-12.5,-12.5,25,25,-12.5,-12.5,25,25);
+	
+	var s = {width:50 * zoom,height:50 * zoom};
+	
+	board.drawImage(img,0,0,22,22,-(s.width / 2),-(s.height / 2),s.width,s.height);
 	if(angle != undefined)
 	board.rotate(-angle);
 	if(test){
@@ -296,6 +317,7 @@ window.onkeydown=function(e){
 		myplayer.velocity -= 1;
 	}
 }
+
 </script>
 </body>
 </html>
