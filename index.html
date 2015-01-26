@@ -1,0 +1,301 @@
+<!doctype html>
+<html>
+<head>
+<style>
+body {
+	margin:0;
+	padding:0;
+}
+.chat {
+	position:absolute;
+	left:0;
+	top:0;
+	z-index:99;
+	color:white;
+	font-family:courier;
+	font-size:.7em;
+}
+body {
+	font-size:12pt;
+}
+.chat input {
+	background:transparent;
+	border:none;
+	outline:none;
+	color:#FFF;
+	background:rgba(0,0,0,.4);
+	padding:5px;
+}
+.chat ul {
+	list-style: none;
+	margin:0;
+	padding:0;
+}
+canvas {
+		image-rendering: optimizeSpeed;
+	image-rendering: -moz-crisp-edges;
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: optimize-contrast;
+}
+</style>
+<script src="perlin.js"></script>
+</head>
+<body>
+	<div class="chat">
+		<input type="text"/>
+		<ul>
+		</ul>
+	</div>
+<canvas width="650" height='500' id="game"></canvas>
+<img src="images/ship.png" id="shit" style="display:none"/>
+<script>
+var board = "";
+var conn = new WebSocket("ws://127.0.0.1:8001");
+document.querySelector("input").addEventListener("keydown",function(e){
+	if(e.keyCode == 13){
+
+		var message = {act:"chat",content:this.value};
+		conn.send(JSON.stringify(message));
+		this.value = "";
+
+	}
+});
+conn.onmessage = function(msg){
+	var r = JSON.parse(msg.data);
+	
+	switch(r.act){
+		case 'chat':
+			console.log("Chat message received");
+			var e = document.createElement("LI");
+			e.appendChild(document.createTextNode(r.content));
+			document.querySelector(".chat>ul").appendChild(e);
+			if(document.querySelector(".chat>ul li").length > 5){
+
+				document.querySelector(".chat>ul").removeChild(document.querySelector(".chat>ul li")[5]);
+
+			}
+		break;
+		case 'listPlayers':
+			players = r.players;
+			//console.log(r.players);
+			//players = new Array({x:50,y:10},{x:50,y:50});
+		break;
+		case 'updateChunks':
+			if(Array.isArray(chunks) && chunks.length > 0){
+				
+				var decided = false;
+
+				if(chunks[0].x != r.chunks[0].x){
+					decided = true;
+				} else if(chunks[0].y != r.chunks[0].y){
+					decided = true;
+				}
+
+				if(decided == true){
+					chunks = r.chunks;
+					//console.log("Updated chunks.");
+				}
+			} else {
+				chunks = r.chunks;	
+				//console.log("Updated chunks.");
+			}
+			
+			
+		break;
+		default:
+		alert("IDK");
+	}
+}
+function player(){
+	//Ctor?
+	this.position = {top:0,left:0};
+	this.rotation = 0;
+	this.velocity = 0;
+	var foo = "bar";
+}
+var myplayer = new player();
+var players = new Array();
+var chunks = new Array();
+var CANVAS_WIDTH = document.getElementById("game").width;
+var CANVAS_HEIGHT = document.getElementById("game").height;
+var bg = document.createElement("canvas");
+bg.width = CANVAS_WIDTH;
+bg.height = CANVAS_HEIGHT;
+function drawChunk(ctx){
+	
+	basePos = {left:0,top:0};
+	ctx.fillStyle = "#FFFFFF";
+
+	for(var c in chunks){
+		var chunk = chunks[c];
+		if(Array.isArray(chunks)){
+			if(chunk.data instanceof ImageData){
+				ctx.putImageData(chunk.data, chunk.x - myplayer.position.left + CANVAS_WIDTH / 2,chunk.y - myplayer.position.top + CANVAS_HEIGHT / 2);
+			} else {
+				var tester = new Uint8ClampedArray(chunk.data.length * 4);
+				var placer = 0;
+				for(var p in chunk.data){
+					tester[placer] = chunk.data[p]*250;
+					tester[placer+1] = 0;
+					tester[placer+2] = 0;
+					tester[placer+3] = 255;
+					placer += 4;
+				}
+				
+				var tempCanvas = document.createElement("canvas");
+				var imageData = tempCanvas.getContext("2d").createImageData(500,500);
+				imageData.data.set(tester);
+				chunks[c].data = imageData;
+
+			}
+		}
+	}
+}
+function drawBg(vel){
+
+	var _bg = bg.getContext("2d");
+	if(vel == undefined){
+		_bg.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+		_bg.fillStyle = "#521ea9";
+		for(var x = 0; x <= CANVAS_WIDTH; x++){
+			for(var y = 0; y <= CANVAS_HEIGHT; y++){
+				var r = noise.perlin2((x + myplayer.position.left) / 1000,(y + myplayer.position.top) / 1000);
+				if( r.toString().substr(3,1) == "1" ){
+					//board.fillStyle = "#"+(r*256).toString(16) + (r*256).toString(16) + (r*256).toString(16);
+					//console.log((Math.abs(r) * 256).toString(16));
+					_bg.fillRect(x,y,noise.perlin2(x / 1000,y / 1000)*15,noise.perlin2(x / 1000,y / 1000)*15);
+				}	
+			}
+		}
+	} else {
+
+		var cloned = _bg.getImageData(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+		_bg.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+		//console.log(vel.left);
+		//_bg.putImageData(cloned,-vel.left,vel.top);
+		var _vel = clone(vel);
+		vel.left = Math.round(vel.left);
+		vel.top = Math.round(vel.top);
+		_bg.putImageData(cloned,-vel.left,vel.top);
+		var reg = {x:-vel.left,y:vel.top,width:CANVAS_WIDTH - vel.left,height:CANVAS_HEIGHT - vel.top};
+		_bg.fillStyle = "#FFFFFF";
+		for(var x = 0; x <= CANVAS_WIDTH; x++){
+			for(var y = 0; y <= CANVAS_HEIGHT; y++){
+				if(intersects({x:x,y:y},reg)){
+					continue;
+				}
+				var r = noise.perlin2((x + myplayer.position.left) / 1000,(y + myplayer.position.top) / 1000);
+				if( r.toString().substr(3,1) == "1"){
+					_bg.fillRect(x,y,1,1);
+				}	
+			}
+		}
+
+	}
+}
+function clone(o){
+	return JSON.parse(JSON.stringify(o));
+}
+function intersects(point,region){
+	var toReturn = false;
+	if(point.x >= region.x && point.x <= region.x + region.width){
+		if(point.y >= region.y && point.y <= region.y + region.height){
+			toReturn = true;
+		}
+	}
+	return toReturn;
+
+}
+window.onload = function(){
+	board = document.getElementById("game").getContext("2d");
+	noise.seed(Math.random());
+	//drawBg();
+	//drawBg({left:0,top:0});
+	setInterval(run,1000/100);
+}
+var basePos;
+var secondCanvas = document.createElement("canvas");
+secondCanvas.getContext("2d").fillStyle = "#95dbe7";
+secondCanvas.getContext("2d").arc(5,5,5,Math.PI*2,false);
+secondCanvas.getContext("2d").fill();
+function run(){
+	
+	board.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+	board.fillStyle = "#212426";
+	board.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+	var img = document.createElement("IMG");
+	img.src = "images/ship.png";
+	
+	board.fillStyle = "#FFFFFF";
+	board.drawImage(bg,0,0);
+	var a = myplayer.rotation * (Math.PI) / 180;
+	if(myplayer.velocity != 0){
+		//drawBg({left:Math.sin(a) * myplayer.velocity,top:Math.cos(a) * myplayer.velocity});
+	}
+	//oard.fillRect(0,0,1,1);
+	drawChunk(board);
+	myplayer.position.left += Math.sin(a) * myplayer.velocity;
+	myplayer.position.top -= Math.cos(a) * myplayer.velocity;
+
+	conn.send(JSON.stringify({act:"move",x:myplayer.position.left,y:myplayer.position.top,angle:a}));
+	drawPlayer(img,myplayer.position.left,myplayer.position.top,false,a);
+	for(var i in players){
+		drawPlayer(img,players[i].x,players[i].y,false,players[i].angle,true);
+	}
+
+
+	board.mozImageSmoothingEnabled = false;
+	board.webkitImageSmoothingEnabled = false;
+	board.msImageSmoothingEnabled = false;
+	board.imageSmoothingEnabled = false;
+	board.drawImage(secondCanvas,0,0,10,10,20,20,50,50);
+	
+
+}
+function drawPlayer(img,x,y,center,angle,test){
+
+	//myplayer.position.left += Math.sin(a) * myplayer.velocity;
+	//myplayer.position.top -= Math.cos(a) * myplayer.velocity;
+	
+	//if(center || "x" == "r")
+		//board.translate((CANVAS_WIDTH / 2) - (x + 12.5),(CANVAS_HEIGHT / 2) - (y + 12.5));
+	//board.translate(x, y);
+	basePos = myplayer.position;
+	
+	board.translate(CANVAS_WIDTH / 2,CANVAS_HEIGHT / 2);
+	if(test){
+		
+		board.translate(x - basePos.left,y - basePos.top);
+	}
+	if(angle != undefined)
+		board.rotate(angle);
+	board.drawImage(img,-12.5,-12.5,25,25);
+	if(angle != undefined)
+	board.rotate(-angle);
+	if(test){
+		board.translate(-(x - basePos.left),-(y - basePos.top));
+	}
+	board.translate(-(CANVAS_WIDTH / 2),-(CANVAS_HEIGHT / 2));
+	//if(center || "x" == "r")
+	//board.translate(-((CANVAS_WIDTH / 2) - (x + 12.5)),-((CANVAS_HEIGHT / 2) - (y + 12.5)));
+	//board.translate(-x, -y);
+
+}
+window.onkeydown=function(e){
+	//console.log(e.keyCode);
+	if(e.keyCode == 39){
+		myplayer.rotation += 10;
+	}
+	if(e.keyCode == 37){
+		myplayer.rotation -= 10;
+	}
+	if(e.keyCode == 38){
+		myplayer.velocity += .3;
+	}
+	if(e.keyCode == 40){
+		myplayer.velocity -= 1;
+	}
+}
+</script>
+</body>
+</html>
